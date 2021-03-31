@@ -1,6 +1,6 @@
 # Classroom Mask Detecor
 ## Demo
-The input image was
+The input image was (The face images were taken from the result of the search query `animated faces` on google
 
 ![demo classroom image](./Assets/classroom_demo.png)
 
