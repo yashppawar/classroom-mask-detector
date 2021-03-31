@@ -1,4 +1,17 @@
 # Classroom Mask Detecor
+## Demo
+The input image was
+
+![demo classroom image](./Assets/classroom_demo.png)
+
+After running this image through the application the sent mail was
+
+![demo mail](./Assets/demo_mail.png)
+
+>The mail consists of the names of the students who are not wearing a mask and their image (images are named as `f'{name_of_student}.png'`)
+
+>If AI fails to identify few student's names it will send another mail consisting the faces of these students
+<hr>
 
 ## Data Set
 In This project, the data set used is from [Kaggle](https://www.kaggle.com) 
@@ -29,11 +42,11 @@ This Notebook is the main mask detector application which can also perform `face
 1. [2.1_Model_Testing.ipynb](./2.1_Model_Testing.ipynb) # Testing the DNN model
 1. [classroom_mask_detector_essestials.py](./classroom_mask_detector_essestials.py) # Custom module which has all the constants and classes to perform the essential tasks for the Project
 ## Dependencies
-- numpy
-- opencv-python
-- cmake
-- dlib
-- face_recognition
-- Matplotlib
-- Keras
-- Tensorflow
+- numpy  `# Basic need`
+- opencv-python  `# Basic need`
+- cmake  `# For face-recognition`
+- dlib  `# For face-recognition`
+- face_recognition  `# For face-recognition`
+- Matplotlib  `# Not important but helpful in development`
+- Keras  `# To make the model`
+- Tensorflow  `# Dependency of Keras`
