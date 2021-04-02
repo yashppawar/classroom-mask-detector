@@ -46,7 +46,7 @@ def get_binary(img, ext='png'):
 
 class KnownFaceEncodings:
     """
-    KnownFaceEncondings class will help in managing the encodings of the Known faces
+    KnownFaceEncodings class will help in managing the encodings of the Known faces
     """
     # Constants / static members
     DATA_FOLDER = './Data/'
@@ -54,24 +54,35 @@ class KnownFaceEncodings:
 
 
     def __init__(self, new_image_added:bool = False):
-        images = []  # for temporary storage
         KNOWN_FACE_FOLDER = KnownFaceEncodings.DATA_FOLDER + 'Known-Faces/'
+        self.data = []
         
         if (KnownFaceEncodings.DATA_FILE in os.listdir(KnownFaceEncodings.DATA_FOLDER)) and not new_image_added:  
             # If there are no changes in the data return the data collected in the last data collection run
-            self.data = np.load(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, allow_pickle=True) 
+            self.data = self.load_data_file() 
 
         else:
             face_images = os.listdir(KNOWN_FACE_FOLDER)  # Get every face image names
             
             for image_name in face_images:  # loop through every images in the KNOWN_FACE_FOLDER
-                image = face_recognition.load_image_file(KNOWN_FACE_FOLDER + image_name)
-            
-                encodings = face_recognition.face_encodings(image)[0]  # Encode the faces in it and store the first encoded face
-                images.append({'encodings': encodings, "name":str(image_name.split('.')[0]).title()})
+                self.__add_image(KNOWN_FACE_FOLDER + image_name, str(image_name.split('.')[0]).title())
                 
-            self.data = np.array(images)
-            np.save(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, self.data)
+            self.save_data()  # Save the data
+
+    def __add_image(self, image_path, name):
+        """Adds the given image to the data"""
+        image = face_recognition.load_image_file(image_path)  # Load the image
+        encodings = face_recognition.face_encodings(image)[0]  # Encode the faces in it and store the first encoded face
+        self.data.append({'encodings': encodings, "name": name})
+
+    def save_data(self):
+        """Saves the collected data in self.data in the provided data file"""
+        self.data = np.array(self.data)  # convert the list to np.array
+        np.save(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, self.data)  # save the data 
+
+    def load_data_file(self):
+        """returns the np.array of the data stored in provided data file"""
+        return np.load(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, allow_pickle=True)
 
     @property
     def encodings(self):
@@ -85,11 +96,12 @@ class KnownFaceEncodings:
 
 
 class ReportAuthority:
+    """Send Mail to the authority using this class, easy to use and will help in managing the mail"""
     def __init__(self, my_email, password, authority_email, name='AI app'):
         if my_email is None or password is None or authority_email is None:
             print('\033[93m Credentials are missing please fill them out! \033[0m')
         
-        self.mail_id = my_email
+        self.mail_id = my_email 
 
         if 'gmail' not in my_email:
             print('\033[93m As your host is not gmail, please provide a host while sending the mail! \033[0m')
