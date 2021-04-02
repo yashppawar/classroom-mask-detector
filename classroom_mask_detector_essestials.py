@@ -136,6 +136,96 @@ class ReportAuthority:
                 return False
 
 
+class WithoutMaskFace:
+    """A class which will deal with the students who are not wearing a mask"""
+    faces = []
+    unidentified_faces = 0
+
+    def __init__(self, name, img):
+        self.name = name
+        self.image = img
+        self.identified = True
+        
+        if not self.__is_in_faces():  # if the person is not in faces, add him/her into it
+            WithoutMaskFace.faces.append(self)
+
+    @classmethod
+    def unidentified(cls, img, encodings):
+        """Add the student who is not wearing a mask and the AI is unable to identify his/her name"""
+        WithoutMaskFace.unidentified_faces += 1
+        cls.encodings = encodings
+        cls.image = img
+        cls.identified = False  # as it is undentified
+        cls.name = 'Undefined-' + str(WithoutMaskFace.unidentified_faces)
+
+        if not cls.__is_in_face():
+            WithoutMaskFace.faces.append(cls)
+
+    def __is_in_faces(self):
+        """Private member, will return `True` if the person in already identified else will return `False`."""
+        if self.identified:  # if it is an identified person
+            for face in WithoutMaskFace.faces: 
+                if self.name == face.name:  # if the person is found return true
+                    return True
+                
+            return False
+        else:  # If it is unidentified person check for the 
+            if len(WithoutMaskFace.faces) == 0:  # if there are no faces in the faces list then return `False`
+                return False
+            
+            matches, distance = self.__get_matches_and_distance()
+
+            min_index = np.argmin(distance)
+
+            return matches[min_index]  # return if the face is a match or not
+
+
+    def __get_matches_and_distance(self):
+        """Return the matches and the distance of the face encodings with the other unidentified faces"""
+        matches = face_recognition.compare_faces(WithoutMaskFace.get_encodings(), self.encodings)
+        distance = face_recognition.face_distance(WithoutMaskFace.get_encodings(), self.encodings)
+
+        return matches, distance
+
+    @staticmethod
+    def flush():
+        """Remove all the faces from the faces list"""
+        WithoutMaskFace.faces = []
+
+    @staticmethod
+    def get_encodings():
+        """"Get the encodigns of all the unidentified faces"""
+        unidentified = filter(lambda obj: not obj.identified, WithoutMaskFace.faces)
+        return np.array(list(map(lambda face: face.encodings[0], unidentified)))
+
+    @staticmethod
+    def report_to_authority(my_email, password, authority_email):
+        if len(WithoutMaskFace.faces) < 1:  # If there is no one to report print that
+            print('[WithoutMaskFace] No Students to report')
+            return
+
+        mail = ReportAuthority(my_email, password, authority_email, name="Student's Mask Detector AI")
+        mail.create_email('Few students are not wearing a mask')
+
+        names = WithoutMaskFace.get_names()  
+        
+        content = f"Greetings,\nThe names of the students who are not wearing mask are:\n{names} "
+
+        # if there are unidentified face tell the authority that there are some unidentified faces
+        if WithoutMaskFace.unidentified_faces > 0:
+            content += "\nThere are some faces also which I could not Identify. So, I have just attached their images."
+
+        mail.set_content(content)
+
+        for student in WithoutMaskFace.faces:
+            image = get_binary(student.image)
+            mail.attach_image(image, 'png', student.name)
+
+        success = mail.send()  # Send the mail
+        # Print the success/failure message
+        print('[WithoutMaskFace] ' + ('Sent the Report' if success else 'Some error occured, could not send the mail!'))
+
+
 class IdentifiedFace:
     """A Class to handel the identified faces which are not wearing mask"""
     faces = []
