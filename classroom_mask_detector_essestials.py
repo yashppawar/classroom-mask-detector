@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+import warnings
 import face_recognition
 
 # Imports for sending the mail
@@ -31,7 +32,7 @@ def preprocess_image(image):
 
 # Function to convert the image into binary
 def get_binary(img, ext='png'):
-    """Will return the """
+    """Will return the binary version of the image"""
     temp_file_path = f"./Data/temp.{ext}"
     cv2.imwrite(temp_file_path, img)
     
@@ -99,13 +100,12 @@ class ReportAuthority:
     """Send Mail to the authority using this class, easy to use and will help in managing the mail"""
     def __init__(self, my_email, password, authority_email, name='AI app'):
         if my_email is None or password is None or authority_email is None:
-            print('\033[93m Credentials are missing please fill them out! \033[0m')
+            print('[Warning] Credentials are missing please fill them out!')
+        elif 'gmail' not in my_email:
+            print('[Warning] As your host is not gmail, please provide a host while sending the mail!')
         
-        self.mail_id = my_email 
-
-        if 'gmail' not in my_email:
-            print('\033[93m As your host is not gmail, please provide a host while sending the mail! \033[0m')
-        
+        # Set the credentials
+        self.mail_id = my_email  
         self.password = password
         self.authority_mail_id = authority_email 
         self.name = name
@@ -141,44 +141,57 @@ class WithoutMaskFace:
     faces = []
     unidentified_faces = 0
 
-    def __init__(self, name, img):
+    def __init__(self, name, img, cm=False):
         self.name = name
         self.image = img
-        self.identified = True
-        
-        if not self.__is_in_faces():  # if the person is not in faces, add him/her into it
-            WithoutMaskFace.faces.append(self)
+
+        if not cm:  # I a class method is not calling it then do the following
+            self.identified = True
+            
+            if not self._is_in_faces():  # if the person is not in faces, add him/her into it
+                WithoutMaskFace.faces.append(self)
+
+    def __repr__(self):
+        return '<%s\'s Face>' % self.name 
 
     @classmethod
     def unidentified(cls, img, encodings):
         """Add the student who is not wearing a mask and the AI is unable to identify his/her name"""
-        WithoutMaskFace.unidentified_faces += 1
-        cls.encodings = encodings
-        cls.image = img
-        cls.identified = False  # as it is undentified
-        cls.name = 'Undefined-' + str(WithoutMaskFace.unidentified_faces)
 
-        if not cls.__is_in_face():
-            WithoutMaskFace.faces.append(cls)
+        name = 'Undefined-' + str(WithoutMaskFace.unidentified_faces)
+        obj = WithoutMaskFace(name, img, cm=True)  # using the class method
 
-    def __is_in_faces(self):
+        obj.encodings = encodings
+        obj.identified = False  # as it is undentified
+
+        if not obj._is_in_faces():
+            WithoutMaskFace.faces.append(obj)
+            WithoutMaskFace.unidentified_faces += 1  # if a new unidentified face is added increment the variable
+
+    def _is_in_faces(self):
         """Private member, will return `True` if the person in already identified else will return `False`."""
         if self.identified:  # if it is an identified person
-            for face in WithoutMaskFace.faces: 
-                if self.name == face.name:  # if the person is found return true
-                    return True
-                
-            return False
+            return self.__identified_is_in_face()
+
         else:  # If it is unidentified person check for the 
-            if len(WithoutMaskFace.faces) == 0:  # if there are no faces in the faces list then return `False`
-                return False
+            return self.__unidentified_is_in_face()
+
+    def __identified_is_in_face(self):
+        for face in WithoutMaskFace.faces: 
+            if self.name == face.name:  # if the person is found return true
+                return True
             
-            matches, distance = self.__get_matches_and_distance()
+        return False
 
-            min_index = np.argmin(distance)
+    def __unidentified_is_in_face(self):
+        if WithoutMaskFace.unidentified_faces == 0:  # if there are no faces in the faces list then return `False`
+            return False
+        
+        matches, distance = self.__get_matches_and_distance()
 
-            return matches[min_index]  # return if the face is a match or not
-
+        min_index = np.argmin(distance)
+        
+        return matches[min_index]  # return if the face is a match or not
 
     def __get_matches_and_distance(self):
         """Return the matches and the distance of the face encodings with the other unidentified faces"""
@@ -199,15 +212,21 @@ class WithoutMaskFace:
         return np.array(list(map(lambda face: face.encodings[0], unidentified)))
 
     @staticmethod
-    def report_to_authority(my_email, password, authority_email):
+    def report_to_authority(my_email, password:str, authority_email, name_separator:str = ',\n'):
+        """
+        Will send a mail to the authority, if there are students who are not wearing a mask
+        will add the names of all the students in the content, the their images
+        for the students whose names are unidentified, only their images will be sent.
+        """
         if len(WithoutMaskFace.faces) < 1:  # If there is no one to report print that
             print('[WithoutMaskFace] No Students to report')
             return
 
+        # create the mail or ReportAuthority object
         mail = ReportAuthority(my_email, password, authority_email, name="Student's Mask Detector AI")
         mail.create_email('Few students are not wearing a mask')
 
-        names = WithoutMaskFace.get_names()  
+        names = WithoutMaskFace.get_names(name_separator)  
         
         content = f"Greetings,\nThe names of the students who are not wearing mask are:\n{names} "
 
@@ -215,8 +234,9 @@ class WithoutMaskFace:
         if WithoutMaskFace.unidentified_faces > 0:
             content += "\nThere are some faces also which I could not Identify. So, I have just attached their images."
 
-        mail.set_content(content)
+        mail.set_content(content)  # add the content
 
+        # add all the images
         for student in WithoutMaskFace.faces:
             image = get_binary(student.image)
             mail.attach_image(image, 'png', student.name)
@@ -225,96 +245,8 @@ class WithoutMaskFace:
         # Print the success/failure message
         print('[WithoutMaskFace] ' + ('Sent the Report' if success else 'Some error occured, could not send the mail!'))
 
-
-class IdentifiedFace:
-    """A Class to handel the identified faces which are not wearing mask"""
-    faces = []
-    def __init__(self, name, img):
-        self.name = name
-        self.image = img
-        
-        if not self.__is_in_faces():  # if the person is not in faces, add him/her into it
-            IdentifiedFace.faces.append(self)
-        
-    def __is_in_faces(self):
-        """Private, will return `True` if it is in IdentifiedFace.faces else `False`"""
-        for face in IdentifiedFace.faces:
-            if self.name == face.name:
-                return True
-            
-        return False
-
     @staticmethod
-    def flush():
-        IdentifiedFace.faces = []
-
-    @staticmethod
-    def report_to_authority(my_email, password, authority_email):
-        if len(IdentifiedFace.faces) < 1:
-            print("[IdentifiedFace] No students to report")
-            return 
-
-        mail = ReportAuthority(my_email, password, authority_email, name="Student's Mask Detector AI")
-        mail.create_email('Few Students not wearing a Mask')
-
-        names = ',\n'.join(list(map(lambda student: student.name, IdentifiedFace.faces)))
-        content = "Greetings,\nThe names of the student who are not weraing mask are:\n" + names
-        mail.set_content(content)
-
-        for student in IdentifiedFace.faces:
-            image = get_binary(student.image)
-            mail.attach_image(image, 'png', student.name)
-
-        success = mail.send()
-        print('[IdentifiedFace] ' + ('Sent the Report' if success else 'Some error occured, could not send the mail!'))
-
-
-
-class UnidentifiedFace:
-    faces = []
-    def __init__(self, img, encodings):
-        self.encodings = encodings
-        self.image = img
-        self.name = 'Undefined-' + str(len(UnidentifiedFace.faces))
-
-        if not self.__is_in_face():
-            UnidentifiedFace.faces.append(self)     
-
-    def __is_in_face(self):
-        if len(UnidentifiedFace.faces) == 0:
-            return False
-        
-        matches = face_recognition.compare_faces(UnidentifiedFace.get_encodings(), self.encodings)
-        distance = face_recognition.face_distance(UnidentifiedFace.get_encodings(), self.encodings)
-
-        min_index = np.argmin(distance)
-        if matches[min_index]:
-            return True
-        return False
-
-    @staticmethod
-    def get_encodings():
-        return np.array(list(map(lambda face: face.encodings[0], UnidentifiedFace.faces)))
-
-    @staticmethod
-    def flush():
-        UnidentifiedFace.faces = []
-
-    @staticmethod
-    def report_to_authority(my_email, password, authority_email):
-        if len(UnidentifiedFace.faces) < 1:
-            print("[UnidentifiedFace] No unidentified students to report")
-            return 
-
-        mail = ReportAuthority(my_email, password, authority_email, name="Student's Mask Detector AI")
-        mail.create_email('Few Students not wearing a Mask!')
-
-        content = "Greetings,\nI Could not Identify the names of the students but their images are attached below\n"
-        mail.set_content(content)
-
-        for student in IdentifiedFace.faces:
-            image = get_binary(student.image)
-            mail.attach_image(image, 'png', student.name)
-
-        success = mail.send()
-        print('[UnidentifiedFace] ' + ('Sent the Report' if success else 'Some error occured, could not send the mail!'))
+    def get_names(seperator:str = ', ') -> str:
+        """Returns the string of the all names combined"""
+        identified_faces = filter(lambda obj: obj.identified, WithoutMaskFace.faces)  # get all the instances of identified face object
+        return seperator.join(list(map(lambda student: student.name, identified_faces)))
