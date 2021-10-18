@@ -4,8 +4,7 @@ import os
 import face_recognition
 
 # Imports for sending the mail
-import smtplib
-from email.message import EmailMessage
+from report_authority import ReportAuthority
 
 # Constants
 IMAGE_SIZE = 32  # Image size 32 x 32 px
@@ -31,7 +30,9 @@ def preprocess_image(image):
 
 # Function to convert the image into binary
 def get_binary(img, ext='png'):
-    """Will return the """
+    """
+    Gets the binary of the image and returns it. 
+    """
     temp_file_path = f"./Data/temp.{ext}"
     cv2.imwrite(temp_file_path, img)
     
@@ -43,23 +44,21 @@ def get_binary(img, ext='png'):
     return content  # the binary version of the image
 
 
-
 class KnownFaceEncodings:
     """
     KnownFaceEncondings class will help in managing the encodings of the Known faces
     """
-    # Constants / static members
     DATA_FOLDER = './Data/'
     DATA_FILE = 'known-faces.npy'
 
 
     def __init__(self, new_image_added:bool = False):
         images = []  # for temporary storage
-        KNOWN_FACE_FOLDER = KnownFaceEncodings.DATA_FOLDER + 'Known-Faces/'
+        KNOWN_FACE_FOLDER = self.DATA_FOLDER + 'Known-Faces/'
         
-        if (KnownFaceEncodings.DATA_FILE in os.listdir(KnownFaceEncodings.DATA_FOLDER)) and not new_image_added:  
+        if (self.DATA_FILE in os.listdir(self.DATA_FOLDER)) and not new_image_added:  
             # If there are no changes in the data return the data collected in the last data collection run
-            self.data = np.load(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, allow_pickle=True) 
+            self.data = np.load(self.DATA_FOLDER + self.DATA_FILE, allow_pickle=True) 
 
         else:
             face_images = os.listdir(KNOWN_FACE_FOLDER)  # Get every face image names
@@ -71,7 +70,7 @@ class KnownFaceEncodings:
                 images.append({'encodings': encodings, "name":str(image_name.split('.')[0]).title()})
                 
             self.data = np.array(images)
-            np.save(KnownFaceEncodings.DATA_FOLDER + KnownFaceEncodings.DATA_FILE, self.data)
+            np.save(self.DATA_FOLDER + self.DATA_FILE, self.data)
 
     @property
     def encodings(self):
@@ -82,47 +81,6 @@ class KnownFaceEncodings:
     def names(self):
         """The numpy.array of all the names"""
         return np.array(list(map(lambda encoding_dict: encoding_dict["name"], self.data)))
-
-
-class ReportAuthority:
-    def __init__(self, my_email, password, authority_email, name='AI app'):
-        if my_email is None or password is None or authority_email is None:
-            print('\033[93m Credentials are missing please fill them out! \033[0m')
-        
-        self.mail_id = my_email
-
-        if 'gmail' not in my_email:
-            print('\033[93m As your host is not gmail, please provide a host while sending the mail! \033[0m')
-        
-        self.password = password
-        self.authority_mail_id = authority_email 
-        self.name = name
-
-    def create_email(self, subject):
-        self.email = EmailMessage()
-        self.email['to'] = self.authority_mail_id
-        self.email['Subject'] = subject
-        self.email['from'] = self.name
-
-    def set_content(self, content):
-        self.email.set_content(content)
-
-    def attach_image(self, image, image_type, name='student'):
-        self.email.add_attachment(image, maintype='image', subtype=image_type, filename=f'{name}.{image_type}')
-
-    def send(self, host='smtp.gmail.com', port=587):
-        with smtplib.SMTP(host=host, port=port) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            
-            try:
-                smtp.login(self.mail_id, self.password)
-                smtp.send_message(self.email)
-                return True
-            except:
-                print("There was a problem while login try again or check if this program is allowed to use the mail services")
-                return False
-
 
 class IdentifiedFace:
     """A Class to handel the identified faces which are not wearing mask"""
@@ -173,7 +131,7 @@ class UnidentifiedFace:
     def __init__(self, img, encodings):
         self.encodings = encodings
         self.image = img
-        self.name = 'Undefined-' + str(len(UnidentifiedFace.faces))
+        self.name = 'Unidentified-' + str(len(UnidentifiedFace.faces))
 
         if not self.__is_in_face():
             UnidentifiedFace.faces.append(self)     
